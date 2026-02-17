@@ -133,7 +133,7 @@ pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 
 [
     pip.override(
-        file = "mypy-1.19.1-{abi}-{abi}-{platform}.whl".format(
+        file = "mypy-1.19.0-{abi}-{abi}-{platform}.whl".format(
             abi = abi,
             platform = platform,
         ),
