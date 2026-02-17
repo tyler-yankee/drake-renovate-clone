@@ -22,7 +22,9 @@ python_required = [
     # builds wheels (see tools/wheel/wheel_builder/macos.py and
     # tools/wheel/wheel_builder/linux.py), then that should be documented for
     # users accordingly.
-    'Mosek==11.1.2 ; python_version < "3.15"',
+    # Additionally, MOSEK is not supported on Linux aarch64. (Apple Silicon
+    # is spelled 'arm64', so this doesn't apply there.)
+    'Mosek==11.1.2 ; python_version < "3.15" and platform_machine != "aarch64"',
 ]
 
 def find_data_files(*patterns):
@@ -88,7 +90,7 @@ See https://drake.mit.edu/pip.html for installation instructions and caveats.
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Libraries :: Python Modules'],
       license='Various',
-      platforms=['linux_x86_64', 'macosx_x86_64', 'macosx_arm64'],
+      platforms=['linux_x86_64', 'macosx_arm64'],
       packages=_actually_find_packages(),
       # Add in any packaged data.
       include_package_data=True,
