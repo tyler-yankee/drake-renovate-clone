@@ -205,8 +205,11 @@ template <typename T>
 std::vector<RotationMatrix<T>> SapDriver<T>::AddContactConstraints(
     const systems::Context<T>& context, SapContactProblem<T>* problem) const {
   DRAKE_DEMAND(problem != nullptr);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   DRAKE_DEMAND(plant().get_discrete_contact_approximation() !=
                DiscreteContactApproximation::kTamsi);
+#pragma GCC diagnostic pop
 
   // Parameters used by SAP to estimate regularization, see [Castro et al.,
   // 2021].
@@ -725,12 +728,10 @@ void SapDriver<T>::AddPdControllerConstraints(
   // Do nothing if not PD controllers were specified.
   if (plant().num_actuators() == 0) return;
 
-  // TODO(amcastro-tri): makes these EvalFoo() instead to avoid heap
-  // allocations.
-  const DesiredStateInput<T> desired_states =
-      manager_->AssembleDesiredStateInput(context);
-  const VectorX<T> feed_forward_actuation =
-      manager_->AssembleActuationInput(context);
+  const DesiredStateInput<T>& desired_states =
+      manager_->EvalDesiredStateInput(context);
+  const VectorX<T>& feed_forward_actuation =
+      manager_->EvalActuationInput(context);
 
   const SpanningForest& forest = get_forest();
   for (ModelInstanceIndex model_instance_index(0);
@@ -1233,7 +1234,7 @@ void SapDriver<T>::CalcActuation(const systems::Context<T>& context,
   // PD controlled actuation values are overwritten below with values computed
   // by the SAP solver, which includes these terms implicitly and enforces
   // effort limits.
-  *actuation = manager().AssembleActuationInput(context);
+  *actuation = manager().EvalActuationInput(context);
 
   // Add contribution from PD controllers.
   const ContactProblemCache<T>& contact_problem_cache =

@@ -174,7 +174,8 @@ enum class ContactModel {
 ///   https://arxiv.org/abs/2110.10107.
 enum class DiscreteContactSolver {
   /// TAMSI solver, see [Castro et al., 2019].
-  kTamsi,
+  kTamsi DRAKE_DEPRECATED("2026-09-01",
+                          "The TAMSI solver is deprecated for removal."),
   /// SAP solver, see [Castro et al., 2022].
   kSap,
 };
@@ -231,7 +232,8 @@ enum class DiscreteContactSolver {
 ///   https://arxiv.org/abs/2312.03908
 enum class DiscreteContactApproximation {
   /// TAMSI solver approximation, see [Castro et al., 2019].
-  kTamsi,
+  kTamsi DRAKE_DEPRECATED("2026-09-01",
+                          "The TAMSI solver is deprecated for removal."),
   /// SAP solver model approximation, see [Castro et al., 2022].
   kSap,
   /// Similarity approximation found in [Castro et al., 2023].
@@ -332,7 +334,7 @@ geometry.
 @anchor model_instances
                         ### Model Instances
 
-A MultiBodyPlant may contain multiple model instances. Each model instance
+A MultibodyPlant may contain multiple model instances. Each model instance
 corresponds to a
 set of bodies and their connections (joints). Model instances provide
 methods to get or set the state of the set of bodies (e.g., through
@@ -609,6 +611,8 @@ cases, simulation stability and robustness can be improved significantly by
 moving your PD controller into the plant where the discrete solver can strongly
 couple controller and model dynamics.
 
+@note PD controllers are ignored when a joint is locked (see Joint::Lock()).
+
 @warning Currently, this feature is only supported for discrete models
 (is_discrete() is true) using the SAP solver (get_discrete_contact_solver()
 returns DiscreteContactSolver::kSap.)
@@ -662,7 +666,7 @@ the net actuation port (get_net_actuation_output_port()). That is, the net
 actuation port reports the total actuation applied by a given actuator.
 
 @note PD controllers are ignored when a joint is locked (see Joint::Lock()), and
-thus they have no effect on the actuation output.
+thus they have no effect on the actuation output nor reaction forces.
 
 @anchor sdf_loading
                  ### Loading models from SDFormat files
@@ -1092,7 +1096,8 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// step, the output value will be all zeros.
   ///
   /// @note PD controllers are not considered for actuators on locked joints,
-  /// see Joint::Lock(). Therefore they do not contribute to this port.
+  /// see Joint::Lock(). Therefore they do not contribute to this port if the
+  /// joint is locked.
   /// @pre Finalize() was already called on `this` plant.
   /// @throws std::exception if called before Finalize().
   const systems::OutputPort<T>& get_net_actuation_output_port() const;
@@ -1113,7 +1118,8 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// step, the output value will be all zeros.
   ///
   /// @note PD controllers are not considered for actuators on locked joints,
-  /// see Joint::Lock(). Therefore they do not contribute to this port.
+  /// see Joint::Lock(). Therefore they do not contribute to this port if the
+  /// joint is locked.
   /// @pre Finalize() was already called on `this` plant.
   /// @throws std::exception if called before Finalize().
   const systems::OutputPort<T>& get_net_actuation_output_port(
@@ -1274,6 +1280,9 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// for details. When sampling is enabled and the plant has not yet taken a
   /// step, the output value will be all zeros.
   ///
+  /// @note PD controllers are not considered for actuators on locked joints,
+  /// see Joint::Lock(). Therefore they do not contribute to this port if the
+  /// joint is locked.
   /// @throws std::exception if called pre-finalize.
   const systems::OutputPort<T>& get_reaction_forces_output_port() const;
 
@@ -1684,6 +1693,12 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// @see AddJointActuator()
   void RemoveJointActuator(const JointActuator<T>& actuator);
 
+  /// Removes the effort limits on all joint actuators. (In other words, sets
+  /// all effort limits to +∞.) This is a convenient way to obtain a plant
+  /// without any built-in effort limits, in case models loaded by the Parser
+  /// have unwanted limits.
+  void RemoveAllJointActuatorEffortLimits();
+
   /// Creates a new model instance.  Returns the index for the model
   /// instance.
   ///
@@ -1804,6 +1819,11 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// GetConstraintActiveStatus() and set its active status with
   /// SetConstraintActiveStatus().
   ///
+  /// @warning Adding constraints to a continuous time plant is allowed at
+  /// configuration time, but will raise exceptions at run time for results
+  /// that should have been affected by the constraints.
+  /// <!-- TODO(#23759,#23760,#23762,#23763,#23992): revisit this documentation
+  /// as constraints are implemented for CENIC. -->
   /// <!-- TODO(joemasterjohn): As different constraint types are added in a
   /// piecemeal fashion, the burden of managing and maintaining these different
   /// constraints becomes cumbersome for the plant. Consider a new
@@ -1942,8 +1962,6 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   ///
   /// @throws if joint0 and joint1 are not both single-dof joints.
   /// @throws std::exception if the %MultibodyPlant has already been finalized.
-  /// @throws std::exception if `this` %MultibodyPlant is not a discrete model
-  /// (is_discrete() == false)
   /// @throws std::exception if `this` %MultibodyPlant's underlying contact
   /// solver is not SAP. (i.e. get_discrete_contact_solver() !=
   /// DiscreteContactSolver::kSap)
@@ -1996,8 +2014,6 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// @throws std::exception if `stiffness` is not positive or zero.
   /// @throws std::exception if `damping` is not positive or zero.
   /// @throws std::exception if the %MultibodyPlant has already been finalized.
-  /// @throws std::exception if `this` %MultibodyPlant is not a discrete model
-  /// (is_discrete() == false)
   /// @throws std::exception if `this` %MultibodyPlant's underlying contact
   /// solver is not SAP. (i.e. get_discrete_contact_solver() !=
   /// DiscreteContactSolver::kSap)
@@ -2055,8 +2071,6 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   ///
   /// @throws std::exception if bodies A and B are the same body.
   /// @throws std::exception if the %MultibodyPlant has already been finalized.
-  /// @throws std::exception if `this` %MultibodyPlant is not a discrete model
-  /// (is_discrete() == false)
   /// @throws std::exception if `this` %MultibodyPlant's underlying contact
   /// solver is not SAP. (i.e. get_discrete_contact_solver() !=
   /// DiscreteContactSolver::kSap)
@@ -2077,8 +2091,6 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   ///
   /// @throws std::exception if bodies A and B are the same body.
   /// @throws std::exception if the %MultibodyPlant has already been finalized.
-  /// @throws std::exception if `this` %MultibodyPlant is not a discrete model
-  /// (is_discrete() == false)
   /// @throws std::exception if `this` %MultibodyPlant's underlying contact
   /// solver is not SAP. (i.e. get_discrete_contact_solver() !=
   /// DiscreteContactSolver::kSap)
@@ -2161,8 +2173,6 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   /// @pre `damping >= 0` (if not std::nullopt).
   ///
   /// @throws std::exception if the %MultibodyPlant has already been finalized.
-  /// @throws std::exception if `this` %MultibodyPlant is not a discrete model
-  /// (`is_discrete() == false`).
   /// @throws std::exception if `this` %MultibodyPlant's underlying contact
   /// solver is not SAP. (i.e. get_discrete_contact_solver() !=
   /// DiscreteContactSolver::kSap).
@@ -5924,6 +5934,8 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   struct CacheIndices {
     systems::CacheIndex geometry_contact_data;
     systems::CacheIndex joint_locking;
+    systems::CacheIndex actuation_input;
+    systems::CacheIndex desired_state_input;
 
     // This is only valid for a continuous-time, hydroelastic-contact plant.
     systems::CacheIndex hydroelastic_contact_forces_continuous;
@@ -6117,11 +6129,16 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
   // have a place we can refer users to for details.
   void EstimatePointContactParameters(double penetration_allowance);
 
-  // Helper method to assemble actuation input vector from the appropriate
-  // ports. The actuation value for a particular actuator can be found at offset
+  // Methods that assemble actuation input vector from the appropriate ports.
+  // The actuation value for a particular actuator can be found at offset
   // JointActuator::input_start() in the returned vector (see
-  // MultibodyPlant::get_actuation_input_port()).
-  VectorX<T> AssembleActuationInput(const systems::Context<T>& context) const;
+  // MultibodyPlant::get_actuation_input_port()). N.B. this does not include
+  // actuation due to the desired_state input ports; this is only the
+  // feedforward actuation.
+  const VectorX<T>& EvalActuationInput(
+      const systems::Context<T>& context) const;
+  void CalcActuationInput(const systems::Context<T>& context,
+                          VectorX<T>* actuation_input) const;
 
   // Calc method for the "net_actuation" output port.
   template <bool sampled>
@@ -6134,9 +6151,17 @@ class MultibodyPlant final : public internal::MultibodyTreeSystem<T> {
                                       const systems::Context<T>& context,
                                       systems::BasicVector<T>* output) const;
 
-  // This fuction evaluates the desired state input ports and returns them as a
+  // These methods evaluate the desired state input ports and return them as a
   // DesiredStateInput.
-  internal::DesiredStateInput<T> AssembleDesiredStateInput(
+  const internal::DesiredStateInput<T>& EvalDesiredStateInput(
+      const systems::Context<T>& context) const;
+  void CalcDesiredStateInput(
+      const systems::Context<T>& context,
+      internal::DesiredStateInput<T>* desired_state_input) const;
+
+  // Throws if the plant uses features not supported by continuous time
+  // calculations.
+  void ThrowIfUnsupportedContinuousTimeDynamics(
       const systems::Context<T>& context) const;
 
   // Computes all non-contact applied forces including:
